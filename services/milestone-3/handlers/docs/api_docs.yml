@@ -1,0 +1,280 @@
+openapi: 3.0.0
+info:
+  title: Milestone Email & Export Service
+  version: 1.0.0
+  description: >
+    API service to send templated emails using AWS SES,
+    generate presigned S3 download links,
+    and export DynamoDB data to CSV/XLSX.
+
+servers:
+  - url: https://your-api-id.execute-api.ap-south-1.amazonaws.com/dev
+    description: Dev environment
+
+paths:
+  /send-email:
+    post:
+      summary: Send an email using a predefined SES template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - toEmail
+                - name
+                - orderId
+              properties:
+                toEmail:
+                  type: array
+                  items:
+                    type: string
+                  example: ["someone@example.com"]
+                name:
+                  type: string
+                  example: "Dhanush"
+                orderId:
+                  type: string
+                  example: "ORDER12345"
+      responses:
+        "200":
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  messageId:
+                    type: string
+        "500":
+          description: Failed to send email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /generate-url:
+    get:
+      summary: Generate Presigned URL
+      description: Generates a presigned GET URL to download a file from S3.
+      parameters:
+        - in: query
+          name: key
+          schema:
+            type: string
+          required: true
+          description: S3 object key (e.g. `uploads/task11.csv`)
+      responses:
+        "200":
+          description: Successfully generated presigned URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignedUrlResponse"
+        "400":
+          description: Missing or invalid query parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /export-data:
+    get:
+      summary: Export DynamoDB data to file
+      description: >
+        Exports data from DynamoDB table into CSV or XLSX format.
+        The file is uploaded to S3 and a signed URL is returned.
+      parameters:
+        - in: query
+          name: filetype
+          schema:
+            type: string
+            enum: [csv, xlsx]
+          required: false
+          description: File type to export (default is csv)
+        - in: query
+          name: columns
+          schema:
+            type: string
+          required: false
+          description: Comma-separated list of columns to include (optional)
+      responses:
+        "200":
+          description: File export successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File uploaded successfully
+                  downloadUrl:
+                    type: string
+                    example: https://bucket.s3.amazonaws.com/exports/file.csv?signature=xyz
+        "400":
+          description: Invalid filetype
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+                
+  /signup:
+    post:
+      summary: Sign up a new user using AWS Cognito
+      description: Registers a new user to the Cognito User Pool and confirms their signup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: The user's email address
+                  example: "user@example.com"
+                password:
+                  type: string
+                  description: The user's password (must meet Cognito password policy)
+                  example: "Password@123"
+                name:
+                  type: string
+                  description: Full name of the user (optional)
+                  example: "Dhanush Alva"
+      responses:
+        "200":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User registration successful"
+                  userConfirmed:
+                    type: boolean
+                  codeDeliveryDetails:
+                    type: object
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+                
+  /signin:
+    post:
+      summary: Authenticate a user via AWS Cognito
+      description: Authenticates a user using their username and password. If MFA is enabled, it returns a challenge session for verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: "user@example.com"
+                password:
+                  type: string
+                  example: "Password@123"
+                mfaCode:
+                  type: string
+                  description: MFA code for SMS (optional, only needed if challenge is returned)
+                  example: "123456"
+                session:
+                  type: string
+                  description: Session returned from previous MFA challenge (optional)
+      responses:
+        "200":
+          description: Login successful or MFA challenge
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Login successful"
+                      idToken:
+                        type: string
+                      accessToken:
+                        type: string
+                      refreshToken:
+                        type: string
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "MFA required"
+                      challengeName:
+                        type: string
+                        example: "SMS_MFA"
+                      session:
+                        type: string
+        "400":
+          description: Missing credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Login failed or internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+
+
+components:
+  schemas:
+    PresignedUrlResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          description: Signed URL to access the file
+          example: https://bucket.s3.amazonaws.com/uploads/file.csv?signature=xyz
+        expiresIn:
+          type: integer
+          description: Time in seconds the URL is valid
+          example: 300
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Internal server error
