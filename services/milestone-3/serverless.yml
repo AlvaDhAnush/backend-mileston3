@@ -138,3 +138,14 @@ resources:
       Properties:
         QueueName: csv-processing-manual-queue
         VisibilityTimeout: 120
+    CsvDataTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: CsvData
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST                                                                                                                                                                                
