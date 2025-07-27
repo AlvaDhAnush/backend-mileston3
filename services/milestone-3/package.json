@@ -1,0 +1,18 @@
+{
+  "name": "milestone-3",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "exceljs": "^4.4.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "uuid": "^11.1.0"
+  }
+}

@@ -1,0 +1,140 @@
+service: milestone-3
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: dev
+  region: ap-south-1
+
+  environment:
+    region: ap-south-1
+    BUCKET_NAME: milestonetestbucket123
+    USER_POOL_ID: ap-south-1_lrsePOE6O
+    CLIENT_ID: 72pupn53loisfoa9r1eutb7kd
+    CONNECTION_TABLE: WebSocketConnections
+    JOB_QUEUE_URL:
+      Ref: JobQueue
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: "*"
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+            - dynamodb:GetItem
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/WebSocketConnections
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource: "*"
+
+package:
+  patterns:
+    - '!.gitignore'
+
+functions:
+  # REST APIs
+  send-email:
+    handler: handlers/ses_email.handler
+    events:
+      - http:
+          path: /send-email
+          method: post
+
+  presigned-url:
+    handler: handlers/presigned_url_3.handler
+    events:
+      - http:
+          path: /presigned-url
+          method: post
+
+  export-data:
+    handler: handlers/export_data_5.handler
+    events:
+      - http:
+          path: /export-data
+          method: get
+
+  signUpUser:
+    handler: handlers/cognito_signup_6.handler
+    events:
+      - http:
+          path: signup
+          method: post
+
+  signInUser:
+    handler: handlers/cognito_signin_7.handler
+    events:
+      - http:
+          path: signin
+          method: post
+
+  connectHandler:
+    handler: handlers/websocket/connection.handler
+    events:
+      - websocket:
+          route: $connect
+
+  disconnectHandler:
+    handler: handlers/websocket/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
+
+  sendMessage:
+    handler: handlers/websocket/sendMessage.handler
+    events:
+      - websocket:
+          route: sendMessage
+  enqueueFile:
+    handler: handlers/sqs/enqueue_file_to_queue.handler
+    events:
+      - http:
+          path: /enqueue-file
+          method: post
+
+  processCsvWorker:
+    handler: handlers/sqs/process_csv_worker.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - JobQueue
+              - Arn
+          batchSize: 1
+          maximumBatchingWindow: 10
+
+resources:
+  Resources:
+    sampleTemplate:
+      Type: AWS::SES::Template
+      Properties: 
+        Template: 
+          HtmlPart: ${file(./templates/sampleTemplate.html)}
+          SubjectPart: Sample Email - TASK 1
+          TemplateName: sampleTemplate
+
+    WebSocketConnections:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: WebSocketConnections
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    JobQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: csv-processing-manual-queue
+        VisibilityTimeout: 120
